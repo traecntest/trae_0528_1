@@ -186,6 +186,65 @@ namespace HardnessMappingTool.Data
             return rowsAffected > 0;
         }
 
+        public async Task<bool> DeleteSampleDataAsync(string sampleId)
+        {
+            using var connection = new SqliteConnection($"Data Source={_databasePath}");
+            await connection.OpenAsync();
+
+            var command = connection.CreateCommand();
+            command.CommandText = "DELETE FROM HardnessTestData WHERE SampleId = @SampleId";
+            command.Parameters.AddWithValue("@SampleId", sampleId);
+
+            var rowsAffected = await command.ExecuteNonQueryAsync();
+            return rowsAffected > 0;
+        }
+
+        public async Task UpdateTestDataAsync(List<HardnessTestData> dataList)
+        {
+            if (dataList.Count == 0) return;
+
+            var sampleId = dataList[0].SampleId;
+
+            using var connection = new SqliteConnection($"Data Source={_databasePath}");
+            await connection.OpenAsync();
+
+            using var transaction = connection.BeginTransaction();
+
+            var deleteCommand = connection.CreateCommand();
+            deleteCommand.CommandText = "DELETE FROM HardnessTestData WHERE SampleId = @SampleId";
+            deleteCommand.Parameters.AddWithValue("@SampleId", sampleId);
+            deleteCommand.Transaction = transaction;
+            await deleteCommand.ExecuteNonQueryAsync();
+
+            foreach (var data in dataList)
+            {
+                var insertCommand = connection.CreateCommand();
+                insertCommand.CommandText = @"
+                    INSERT INTO HardnessTestData 
+                    (SampleId, HardnessType, X, Y, Z, HardnessValue, Load, IndentationDiagonal, TestTime, OperatorName, Remarks, IsValid)
+                    VALUES (@SampleId, @HardnessType, @X, @Y, @Z, @HardnessValue, @Load, @IndentationDiagonal, @TestTime, @OperatorName, @Remarks, @IsValid)
+                ";
+
+                insertCommand.Parameters.AddWithValue("@SampleId", data.SampleId);
+                insertCommand.Parameters.AddWithValue("@HardnessType", (int)data.HardnessType);
+                insertCommand.Parameters.AddWithValue("@X", data.X);
+                insertCommand.Parameters.AddWithValue("@Y", data.Y);
+                insertCommand.Parameters.AddWithValue("@Z", data.Z);
+                insertCommand.Parameters.AddWithValue("@HardnessValue", data.HardnessValue);
+                insertCommand.Parameters.AddWithValue("@Load", data.Load.HasValue ? data.Load.Value : DBNull.Value);
+                insertCommand.Parameters.AddWithValue("@IndentationDiagonal", data.IndentationDiagonal.HasValue ? data.IndentationDiagonal.Value : DBNull.Value);
+                insertCommand.Parameters.AddWithValue("@TestTime", data.TestTime.ToString("o"));
+                insertCommand.Parameters.AddWithValue("@OperatorName", string.IsNullOrEmpty(data.OperatorName) ? DBNull.Value : data.OperatorName);
+                insertCommand.Parameters.AddWithValue("@Remarks", string.IsNullOrEmpty(data.Remarks) ? DBNull.Value : data.Remarks);
+                insertCommand.Parameters.AddWithValue("@IsValid", data.IsValid);
+
+                insertCommand.Transaction = transaction;
+                await insertCommand.ExecuteNonQueryAsync();
+            }
+
+            transaction.Commit();
+        }
+
         public async Task<List<string>> GetAllSampleIdsAsync()
         {
             var results = new List<string>();

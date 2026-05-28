@@ -1,6 +1,7 @@
 using System;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Data;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
@@ -39,6 +40,9 @@ namespace HardnessMappingTool.ViewModels
         private PlotModel? _currentPlot;
         private string _statusMessage = "就绪";
         private StatisticsResult? _statistics;
+        private DistributionMatrix? _distributionMatrix;
+        private DataTable? _distributionMatrixTable;
+        private double[,,]? _distributionMatrix3D;
 
         public MainViewModel()
         {
@@ -96,6 +100,24 @@ namespace HardnessMappingTool.ViewModels
         {
             get => _statistics;
             set { _statistics = value; OnPropertyChanged(); }
+        }
+
+        public DistributionMatrix? DistributionMatrix
+        {
+            get => _distributionMatrix;
+            set { _distributionMatrix = value; OnPropertyChanged(); }
+        }
+
+        public DataTable? DistributionMatrixTable
+        {
+            get => _distributionMatrixTable;
+            set { _distributionMatrixTable = value; OnPropertyChanged(); }
+        }
+
+        public double[,,]? DistributionMatrix3D
+        {
+            get => _distributionMatrix3D;
+            set { _distributionMatrix3D = value; OnPropertyChanged(); }
         }
 
         private async void InitializeDatabase()
@@ -338,9 +360,59 @@ namespace HardnessMappingTool.ViewModels
             try
             {
                 StatusMessage = "正在保存数据...";
-                await _dbContext.BulkInsertTestDataAsync(TestData);
+                var existingIds = await _dbContext.GetAllSampleIdsAsync();
+                if (existingIds.Contains(SelectedSampleId ?? string.Empty))
+                {
+                    var result = MessageBox.Show(
+                        $"样品 {SelectedSampleId} 已存在数据，是否覆盖现有数据？",
+                        "确认覆盖",
+                        MessageBoxButton.YesNo,
+                        MessageBoxImage.Question);
+
+                    if (result == MessageBoxResult.Yes)
+                    {
+                        await _dbContext.UpdateTestDataAsync(TestData.ToList());
+                    }
+                    else
+                    {
+                        return;
+                    }
+                }
+                else
+                {
+                    await _dbContext.BulkInsertTestDataAsync(TestData);
+                }
                 await LoadSampleIds();
                 StatusMessage = "数据保存成功";
+                MessageBox.Show("数据保存成功！", "完成", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                StatusMessage = $"保存失败: {ex.Message}";
+                MessageBox.Show($"保存失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        public async Task SaveProcessedData()
+        {
+            if (!TestData.Any())
+            {
+                MessageBox.Show("没有数据可保存", "提示", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            if (string.IsNullOrEmpty(SelectedSampleId))
+            {
+                MessageBox.Show("请先选择或设置样品编号", "提示", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            try
+            {
+                StatusMessage = "正在保存处理后的数据...";
+                await _dbContext.UpdateTestDataAsync(TestData.ToList());
+                await LoadSampleIds();
+                StatusMessage = "处理后的数据保存成功";
                 MessageBox.Show("数据保存成功！", "完成", MessageBoxButton.OK, MessageBoxImage.Information);
             }
             catch (Exception ex)
@@ -388,19 +460,201 @@ namespace HardnessMappingTool.ViewModels
             }
 
             var result = MessageBox.Show(
-                $"确定要删除样品 {SelectedSampleId} 的所有数据吗？",
+                $"确定要从数据库中删除样品 {SelectedSampleId} 的所有数据吗？此操作不可撤销！",
                 "确认删除",
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Warning);
 
             if (result == MessageBoxResult.Yes)
             {
-                TestData.Clear();
-                await LoadSampleIds();
-                CurrentPlot = null;
-                Statistics = null;
-                StatusMessage = "数据已清除";
+                try
+                {
+                    StatusMessage = "正在删除数据...";
+                    await _dbContext.DeleteSampleDataAsync(SelectedSampleId);
+                    TestData.Clear();
+                    DistributionMatrix = null;
+                    DistributionMatrixTable = null;
+                    DistributionMatrix3D = null;
+                    CurrentPlot = null;
+                    Statistics = null;
+                    await LoadSampleIds();
+                    SelectedSampleId = null;
+                    StatusMessage = $"样品 {SelectedSampleId} 数据已删除";
+                    MessageBox.Show("数据删除成功！", "完成", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+                catch (Exception ex)
+                {
+                    StatusMessage = $"删除失败: {ex.Message}";
+                    MessageBox.Show($"删除失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
             }
+        }
+
+        public void Calculate2DDistributionMatrix(int gridSizeX = 50, int gridSizeY = 50, InterpolationMethod method = InterpolationMethod.InverseDistanceWeighting)
+        {
+            if (!TestData.Any())
+            {
+                MessageBox.Show("没有可计算的数据", "提示", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            try
+            {
+                StatusMessage = "正在计算二维硬度分布矩阵...";
+                DistributionMatrix = _distributionCalculator.Calculate2DDistribution(
+                    TestData.ToList(), gridSizeX, gridSizeY, method);
+                
+                DistributionMatrixTable = ConvertMatrixToDataTable(DistributionMatrix);
+                StatusMessage = $"二维分布矩阵计算完成 ({gridSizeX}x{gridSizeY})";
+            }
+            catch (Exception ex)
+            {
+                StatusMessage = $"计算失败: {ex.Message}";
+                MessageBox.Show($"计算失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        public void Calculate3DDistributionMatrix(int gridSizeX = 20, int gridSizeY = 20, int gridSizeZ = 10, InterpolationMethod method = InterpolationMethod.InverseDistanceWeighting)
+        {
+            if (!TestData.Any())
+            {
+                MessageBox.Show("没有可计算的数据", "提示", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            try
+            {
+                StatusMessage = "正在计算三维硬度分布矩阵...";
+                DistributionMatrix3D = _distributionCalculator.Calculate3DDistribution(
+                    TestData.ToList(), gridSizeX, gridSizeY, gridSizeZ, method);
+                StatusMessage = $"三维分布矩阵计算完成 ({gridSizeX}x{gridSizeY}x{gridSizeZ})";
+            }
+            catch (Exception ex)
+            {
+                StatusMessage = $"计算失败: {ex.Message}";
+                MessageBox.Show($"计算失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private DataTable? ConvertMatrixToDataTable(DistributionMatrix matrix)
+        {
+            if (matrix == null || matrix.Values == null) return null;
+
+            var dataTable = new DataTable();
+            
+            dataTable.Columns.Add("Y\\X", typeof(string));
+            for (int j = 0; j < matrix.Columns; j++)
+            {
+                var xValue = matrix.MinX + j * matrix.StepX;
+                dataTable.Columns.Add(xValue.ToString("F1"), typeof(double));
+            }
+
+            for (int i = 0; i < matrix.Rows; i++)
+            {
+                var row = dataTable.NewRow();
+                var yValue = matrix.MinY + i * matrix.StepY;
+                row[0] = yValue.ToString("F1");
+                for (int j = 0; j < matrix.Columns; j++)
+                {
+                    row[j + 1] = Math.Round(matrix.Values[i, j], 2);
+                }
+                dataTable.Rows.Add(row);
+            }
+
+            return dataTable;
+        }
+
+        public void ShowDistributionMatrixView()
+        {
+            if (DistributionMatrixTable == null)
+            {
+                Calculate2DDistributionMatrix();
+            }
+
+            if (DistributionMatrixTable == null) return;
+
+            var window = new Window
+            {
+                Title = $"{SelectedSampleId} - 硬度分布矩阵数据",
+                Width = 800,
+                Height = 600,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                Owner = Application.Current.MainWindow
+            };
+
+            var grid = new Grid();
+            grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+
+            var dataGrid = new System.Windows.Controls.DataGrid
+            {
+                ItemsSource = DistributionMatrixTable.DefaultView,
+                IsReadOnly = true,
+                AutoGenerateColumns = true,
+                CanUserAddRows = false,
+                CanUserSortColumns = false,
+                FontSize = 11,
+                Margin = new Thickness(5)
+            };
+
+            var infoPanel = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                Margin = new Thickness(5),
+                HorizontalAlignment = HorizontalAlignment.Right
+            };
+
+            var closeButton = new System.Windows.Controls.Button
+            {
+                Content = "关闭",
+                Width = 75,
+                Margin = new Thickness(5)
+            };
+            closeButton.Click += (s, e) => window.Close();
+
+            infoPanel.Children.Add(closeButton);
+
+            Grid.SetRow(dataGrid, 0);
+            Grid.SetRow(infoPanel, 1);
+            grid.Children.Add(dataGrid);
+            grid.Children.Add(infoPanel);
+
+            window.Content = grid;
+            window.ShowDialog();
+        }
+
+        public void Show3DDistributionMatrixView()
+        {
+            if (DistributionMatrix3D == null)
+            {
+                Calculate3DDistributionMatrix();
+            }
+
+            if (DistributionMatrix3D == null) return;
+
+            var window = new Window
+            {
+                Title = $"{SelectedSampleId} - 三维硬度分布矩阵",
+                Width = 400,
+                Height = 300,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                Owner = Application.Current.MainWindow
+            };
+
+            var grid = new Grid();
+            var textBlock = new System.Windows.Controls.TextBlock
+            {
+                Text = $"三维矩阵已计算完成！\n\n尺寸: {DistributionMatrix3D.GetLength(2)} x {DistributionMatrix3D.GetLength(1)} x {DistributionMatrix3D.GetLength(0)}\n\n可通过热力图或等高线图查看各切面的硬度分布。",
+                Margin = new Thickness(20),
+                TextWrapping = TextWrapping.Wrap,
+                FontSize = 14,
+                VerticalAlignment = VerticalAlignment.Center,
+                HorizontalAlignment = HorizontalAlignment.Center
+            };
+
+            grid.Children.Add(textBlock);
+            window.Content = grid;
+            window.ShowDialog();
         }
 
         public event PropertyChangedEventHandler? PropertyChanged;

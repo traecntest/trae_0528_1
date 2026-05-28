@@ -28,17 +28,28 @@
                 <Separator/>
                 <MenuItem Header="导出数据..." Click="ExportData_Click"/>
                 <Separator/>
+                <MenuItem Header="保存处理后的数据" Click="SaveProcessedData_Click"/>
+                <Separator/>
                 <MenuItem Header="退出" Click="Exit_Click"/>
             </MenuItem>
             <MenuItem Header="数据处理(_P)">
                 <MenuItem Header="剔除异常值" Click="RemoveOutliers_Click"/>
                 <MenuItem Header="移动平均去噪" Click="NoiseReduction_Click"/>
+                <Separator/>
+                <MenuItem Header="保存处理结果" Click="SaveProcessedData_Click"/>
             </MenuItem>
             <MenuItem Header="可视化(_V)">
                 <MenuItem Header="热力图" Click="ShowHeatMap_Click"/>
                 <MenuItem Header="等高线图" Click="ShowContourMap_Click"/>
                 <MenuItem Header="散点图" Click="ShowScatterPlot_Click"/>
                 <MenuItem Header="直方图" Click="ShowHistogram_Click"/>
+            </MenuItem>
+            <MenuItem Header="分布矩阵(_M)">
+                <MenuItem Header="计算二维分布矩阵" Click="Calculate2DMatrix_Click"/>
+                <MenuItem Header="计算三维分布矩阵" Click="Calculate3DMatrix_Click"/>
+                <Separator/>
+                <MenuItem Header="查看矩阵数据" Click="ShowMatrixView_Click"/>
+                <MenuItem Header="查看三维矩阵信息" Click="Show3DMatrixView_Click"/>
             </MenuItem>
             <MenuItem Header="报表(_R)">
                 <MenuItem Header="生成文本报告" Click="GenerateTextReport_Click"/>
@@ -78,13 +89,17 @@
                     </GroupBox>
 
                     <GroupBox Grid.Row="1" Header="快速操作" Margin="5">
-                        <UniformGrid Columns="2" Rows="3">
+                        <UniformGrid Columns="2" Rows="5">
                             <Button Content="热力图" Margin="2" Click="ShowHeatMap_Click"/>
                             <Button Content="等高线图" Margin="2" Click="ShowContourMap_Click"/>
                             <Button Content="散点图" Margin="2" Click="ShowScatterPlot_Click"/>
                             <Button Content="直方图" Margin="2" Click="ShowHistogram_Click"/>
+                            <Button Content="分布矩阵" Margin="2" Click="ShowMatrixView_Click"/>
+                            <Button Content="2D计算" Margin="2" Click="Calculate2DMatrix_Click"/>
                             <Button Content="剔除异常值" Margin="2" Click="RemoveOutliers_Click"/>
                             <Button Content="去噪处理" Margin="2" Click="NoiseReduction_Click"/>
+                            <Button Content="保存处理" Margin="2" Click="SaveProcessedData_Click"/>
+                            <Button Content="删除样品" Margin="2" Click="ClearData_Click" Background="#FFE8A0A0"/>
                         </UniformGrid>
                     </GroupBox>
 
