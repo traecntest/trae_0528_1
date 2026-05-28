@@ -7,8 +7,12 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using Microsoft.Win32;
 using OxyPlot;
+using WpfHorizontalAlignment = System.Windows.HorizontalAlignment;
+using WpfVerticalAlignment = System.Windows.VerticalAlignment;
 using HardnessMappingTool.Data;
 using HardnessMappingTool.Models;
 using HardnessMappingTool.Services.DataImport;
@@ -601,7 +605,7 @@ namespace HardnessMappingTool.ViewModels
             {
                 Orientation = Orientation.Horizontal,
                 Margin = new Thickness(5),
-                HorizontalAlignment = HorizontalAlignment.Right
+                HorizontalAlignment = WpfHorizontalAlignment.Right
             };
 
             var closeButton = new System.Windows.Controls.Button
@@ -648,8 +652,8 @@ namespace HardnessMappingTool.ViewModels
                 Margin = new Thickness(20),
                 TextWrapping = TextWrapping.Wrap,
                 FontSize = 14,
-                VerticalAlignment = VerticalAlignment.Center,
-                HorizontalAlignment = HorizontalAlignment.Center
+                VerticalAlignment = WpfVerticalAlignment.Center,
+                HorizontalAlignment = WpfHorizontalAlignment.Center
             };
 
             grid.Children.Add(textBlock);
