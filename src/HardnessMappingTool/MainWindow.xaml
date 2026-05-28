@@ -1,0 +1,157 @@
+﻿<Window x:Class="HardnessMappingTool.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:HardnessMappingTool"
+        xmlns:oxy="http://oxyplot.org/wpf"
+        xmlns:viewModels="clr-namespace:HardnessMappingTool.ViewModels"
+        mc:Ignorable="d"
+        Title="材料硬度分布映射工具" Height="800" Width="1400"
+        WindowStartupLocation="CenterScreen">
+    <Window.DataContext>
+        <viewModels:MainViewModel/>
+    </Window.DataContext>
+    
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <Menu Grid.Row="0">
+            <MenuItem Header="文件(_F)">
+                <MenuItem Header="导入 CSV 文件..." Click="ImportCsv_Click"/>
+                <MenuItem Header="导入 Excel 文件..." Click="ImportExcel_Click"/>
+                <MenuItem Header="导入 XML 文件..." Click="ImportXml_Click"/>
+                <Separator/>
+                <MenuItem Header="导出数据..." Click="ExportData_Click"/>
+                <Separator/>
+                <MenuItem Header="退出" Click="Exit_Click"/>
+            </MenuItem>
+            <MenuItem Header="数据处理(_P)">
+                <MenuItem Header="剔除异常值" Click="RemoveOutliers_Click"/>
+                <MenuItem Header="移动平均去噪" Click="NoiseReduction_Click"/>
+            </MenuItem>
+            <MenuItem Header="可视化(_V)">
+                <MenuItem Header="热力图" Click="ShowHeatMap_Click"/>
+                <MenuItem Header="等高线图" Click="ShowContourMap_Click"/>
+                <MenuItem Header="散点图" Click="ShowScatterPlot_Click"/>
+                <MenuItem Header="直方图" Click="ShowHistogram_Click"/>
+            </MenuItem>
+            <MenuItem Header="报表(_R)">
+                <MenuItem Header="生成文本报告" Click="GenerateTextReport_Click"/>
+                <MenuItem Header="生成 HTML 报告" Click="GenerateHtmlReport_Click"/>
+            </MenuItem>
+            <MenuItem Header="工具(_T)">
+                <MenuItem Header="生成测试数据" Click="GenerateTestData_Click"/>
+                <MenuItem Header="保存测试数据" Click="SaveTestData_Click"/>
+            </MenuItem>
+        </Menu>
+
+        <Grid Grid.Row="1" Margin="5">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="300"/>
+                <ColumnDefinition Width="5"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <Border Grid.Column="0" BorderBrush="LightGray" BorderThickness="1" CornerRadius="5">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <GroupBox Grid.Row="0" Header="样品选择" Margin="5">
+                        <StackPanel>
+                            <ComboBox ItemsSource="{Binding SampleIds}" 
+                                      SelectedItem="{Binding SelectedSampleId}"
+                                      Margin="5" Height="25"/>
+                            <Button Content="清除当前样品数据" Margin="5" 
+                                    Click="ClearData_Click" Background="#FFE8A0A0"/>
+                        </StackPanel>
+                    </GroupBox>
+
+                    <GroupBox Grid.Row="1" Header="快速操作" Margin="5">
+                        <UniformGrid Columns="2" Rows="3">
+                            <Button Content="热力图" Margin="2" Click="ShowHeatMap_Click"/>
+                            <Button Content="等高线图" Margin="2" Click="ShowContourMap_Click"/>
+                            <Button Content="散点图" Margin="2" Click="ShowScatterPlot_Click"/>
+                            <Button Content="直方图" Margin="2" Click="ShowHistogram_Click"/>
+                            <Button Content="剔除异常值" Margin="2" Click="RemoveOutliers_Click"/>
+                            <Button Content="去噪处理" Margin="2" Click="NoiseReduction_Click"/>
+                        </UniformGrid>
+                    </GroupBox>
+
+                    <GroupBox Grid.Row="2" Header="统计指标" Margin="5">
+                        <Grid Margin="5">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="22"/>
+                                <RowDefinition Height="22"/>
+                                <RowDefinition Height="22"/>
+                                <RowDefinition Height="22"/>
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="测试点数:"/>
+                            <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding Statistics.ValidCount}"/>
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="平均值:"/>
+                            <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding Statistics.Mean, StringFormat=F2}"/>
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="标准差:"/>
+                            <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding Statistics.StandardDeviation, StringFormat=F2}"/>
+                            <TextBlock Grid.Row="3" Grid.Column="0" Text="范围:"/>
+                            <TextBlock Grid.Row="3" Grid.Column="1">
+                                <TextBlock.Text>
+                                    <MultiBinding StringFormat="{}{0:F2} ~ {1:F2}">
+                                        <Binding Path="Statistics.Minimum"/>
+                                        <Binding Path="Statistics.Maximum"/>
+                                    </MultiBinding>
+                                </TextBlock.Text>
+                            </TextBlock>
+                        </Grid>
+                    </GroupBox>
+
+                    <GroupBox Grid.Row="3" Header="数据列表" Margin="5">
+                        <DataGrid ItemsSource="{Binding TestData}" 
+                                  AutoGenerateColumns="False"
+                                  CanUserAddRows="False"
+                                  IsReadOnly="True"
+                                  Margin="5">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="X" Binding="{Binding X, StringFormat=F2}" Width="50"/>
+                                <DataGridTextColumn Header="Y" Binding="{Binding Y, StringFormat=F2}" Width="50"/>
+                                <DataGridTextColumn Header="硬度" Binding="{Binding HardnessValue, StringFormat=F2}" Width="60"/>
+                                <DataGridCheckBoxColumn Header="有效" Binding="{Binding IsValid}" Width="40"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </GroupBox>
+                </Grid>
+            </Border>
+
+            <GridSplitter Grid.Column="1" Width="5" ResizeDirection="Columns" Background="Transparent"/>
+
+            <Border Grid.Column="2" BorderBrush="LightGray" BorderThickness="1" CornerRadius="5">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <oxy:PlotView Model="{Binding CurrentPlot}" Margin="5"/>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <StatusBar Grid.Row="2">
+            <StatusBarItem>
+                <TextBlock Text="{Binding StatusMessage}"/>
+            </StatusBarItem>
+        </StatusBar>
+    </Grid>
+</Window>
